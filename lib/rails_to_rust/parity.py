@@ -143,9 +143,15 @@ def mutation_diff(root, *, output="parity/results/mutation.json", force=False):
         argv = commands[side]
         run(argv[side + "_command"], cwd=root, timeout=settings.get("timeout_seconds", 180))
         after[side] = snapshot(root, argv["snapshot_command"])
-    passed = after["reference"] == after["candidate"]
+    changed = {side: after[side] != before[side] for side in ["reference", "candidate"]}
+    problems = []
+    if after["reference"] != after["candidate"]:
+        problems.append("post-mutation states differ")
+    if settings.get("expect_change", True):
+        problems.extend(f"{side} action produced no observed state change" for side, observed in changed.items() if not observed)
+    passed = not problems
     value = {"version": 1, "kind": "mutation-parity", "reference_sha": config["project"]["reference_sha"],
-             "passed": passed, "baseline_equal": True,
+             "passed": passed, "baseline_equal": True, "changed": changed, "problems": problems,
              "state_sha256": {side: hashlib.sha256(json_text(state).encode()).hexdigest() for side, state in after.items()}}
     write(generated_path(root, output), json_text(value), force=force)
     return value

@@ -93,7 +93,10 @@ def verify(root, *, output="parity/results/verification.json", force=False, part
     commands = [(name, command(config["checks"].get(name), project=str(root))) for name in names]
     checks = []
     for name, argv in commands:
-        run(argv, cwd=root, timeout=config["checks"].get("timeout_seconds", 900))
+        try:
+            run(argv, cwd=root, timeout=config["checks"].get("timeout_seconds", 900))
+        except Error as error:
+            raise Error(f"{name} gate failed: {error}") from error
         checks.append({"check": name, "passed": True})
     parity = compare(root, output="parity/results/verification-http.json", force=force)
     checks.append({"check": "http-parity", "passed": parity["passed"]})

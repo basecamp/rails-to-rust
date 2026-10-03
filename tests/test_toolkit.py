@@ -107,6 +107,39 @@ rollback = []
         text = re.sub(r'^candidate_url = .*', "candidate_url = " + json.dumps(right), text, flags=re.M)
         p.write_text(text)
 
+    def test_ruby_exporter_bypasses_string_subclass_json_and_records_patchlevel(self):
+        # Exercise the real Ruby exporter, including its final JSON framing. The
+        # subclass models Rails SafeBuffer's to_json override rather than copying
+        # the exporter implementation into a Python assertion.
+        ruby = os.environ.get("RAILS_TO_RUST_TEST_RUBY", "ruby")
+        program = r"""# encoding: UTF-8
+require 'json'
+class UnsafeJsonString < String
+  def to_json(*args); '"corrupted"'; end
+end
+module Rails
+  module VERSION; STRING = '2.3.fixture'; end
+end
+module ActiveRecord
+  class Base
+    def self.connection; self; end
+    def self.adapter_name; 'Fixture'; end
+  end
+end
+# Gem metadata is part of the export and must preserve the original bytes.
+spec = Struct.new(:version, :full_gem_path).new('1', UnsafeJsonString.new("café 日本 🍣"))
+Gem.loaded_specs['fixture'] = spec
+"""
+        script = self.base / "exporter-test.rb"
+        script.write_text(program + (ROOT / "templates/reference-tools/export.rb").read_text())
+        env = dict(os.environ, RAILS_TO_RUST_EXPORT="runtime", RAILS_TO_RUST_REFERENCE_SHA=self.sha)
+        result = subprocess.run([ruby, str(script)], env=env, capture_output=True, check=True)
+        output = result.stdout.decode()
+        payload = json.loads(output.split(BEGIN, 1)[1].split(END, 1)[0])
+        self.assertEqual(payload["data"]["gems"]["fixture"]["source"], "café 日本 🍣")
+        self.assertIsInstance(payload["runtime"]["ruby_patchlevel"], int)
+        self.assertEqual(payload["reference_sha"], self.sha)
+
     def test_inventory_detects_legacy_formats_and_encoding_without_modification(self):
         before = git(self.source, "status", "--porcelain")
         result = inspect(self.source)
@@ -255,6 +288,22 @@ rollback = []
         for side in ["reference", "candidate"]:
             self.assertEqual(json.loads((self.port / (side + ".json")).read_text()), {"rows": [1]})
 
+    def test_mutation_diff_rejects_matching_noop_runners(self):
+        self.configure_mutations()
+        path = self.port / "migration.toml"
+        lines = path.read_text().splitlines()
+        for index, line in enumerate(lines):
+            if line.startswith(("reference_command =", "candidate_command =")):
+                name = line.split(" =", 1)[0]
+                lines[index] = name + " = " + json.dumps([sys.executable, "-c", "pass"])
+        path.write_text("\n".join(lines) + "\n")
+        result = mutation_diff(self.port)
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["changed"], {"reference": False, "candidate": False})
+        self.assertEqual(len(result["problems"]), 2)
+        path.write_text(path.read_text() + "expect_change = false\n")
+        self.assertTrue(mutation_diff(self.port, force=True)["passed"])
+
     def configure_mutations(self, *, unequal_baseline=False, unequal_result=False):
         reset_code = "from pathlib import Path; import json,sys; "
         reset_code += "rows = [9] if sys.argv[1] == 'candidate' else []; " if unequal_baseline else "rows = []; "
@@ -306,6 +355,20 @@ rollback = []
         self.assertEqual(result["scope"], "partial")
         self.assertEqual([row["check"] for row in result["checks"]], ["format", "lint", "test", "http-parity"])
         self.assertTrue(all((self.port / (name + ".ran")).exists() for name in ["format", "lint", "test"]))
+
+    def test_verify_identifies_failed_gate_without_exposing_captured_output(self):
+        self.configure_verification()
+        path = self.port / "migration.toml"
+        text = path.read_text()
+        text = re.sub(r'^format = .*', "format = " + json.dumps(
+            [sys.executable, "-c", "print('private-boot-log'); raise SystemExit(7)"]), text, flags=re.M)
+        path.write_text(text)
+        self.cases([{"id": "home", "path": "/", "expected_status": 200}],
+                   "http://127.0.0.1:1", "http://127.0.0.1:2")
+        with self.assertRaisesRegex(Error, "format gate failed: .* exited with status 7") as error:
+            verify(self.port, partial=True)
+        self.assertNotIn("private-boot-log", str(error.exception))
+        self.assertFalse((self.port / "test.ran").exists())
 
     def test_verified_evidence_rejects_failed_stale_and_invalid_json(self):
         self.configure_verification(status="verified")

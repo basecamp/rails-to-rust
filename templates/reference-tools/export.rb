@@ -6,7 +6,11 @@ require "digest"
 module RailsToRust
   def self.encode(value)
     case value
-    when NilClass, TrueClass, FalseClass, String, Numeric then value
+    when String
+      # Rails SafeBuffer subclasses can override to_json; old JSON gems call it even
+      # inside pretty_generate, corrupting non-BMP text. Export plain String bytes.
+      String.new(value)
+    when NilClass, TrueClass, FalseClass, Numeric then value
     when Symbol then value.to_s
     when Regexp then { "regexp" => value.source, "options" => value.options }
     when Array then value.map { |item| encode(item) }
@@ -94,7 +98,7 @@ module RailsToRust
       spec = Gem.loaded_specs[name]
       gems[name] = { "version" => spec.version.to_s, "source" => spec.full_gem_path }
     end
-    { "ruby_version" => RUBY_VERSION, "rails_version" => rails_version,
+    { "ruby_version" => RUBY_VERSION, "ruby_patchlevel" => RUBY_PATCHLEVEL, "rails_version" => rails_version,
       "adapter" => adapter, "gems" => gems }
   end
 end
@@ -107,8 +111,8 @@ data = case kind
        else raise "unknown export #{kind}"
        end
 puts "--- RAILS_TO_RUST_JSON_BEGIN ---"
-puts JSON.pretty_generate({
+puts JSON.pretty_generate(RailsToRust.encode({
   "version" => 1, "kind" => kind, "reference_sha" => ENV.fetch("RAILS_TO_RUST_REFERENCE_SHA"),
   "runtime" => RailsToRust.runtime, "data" => data
-})
+}))
 puts "--- RAILS_TO_RUST_JSON_END ---"

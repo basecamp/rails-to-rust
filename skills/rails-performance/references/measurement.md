@@ -11,7 +11,11 @@ not a faster application.
 Measure populated routes and writes with realistic rich text/attachments and callback fanout.
 Distinguish microbenchmarks (escaping, row decoding, recognition, compression, build scripts)
 from total HTTP improvement. Warmed MySQL SQL logs must exclude statement preparation and restore
-log configuration afterwards. Keep logs isolated from production and redact actual credentials.
+log configuration afterwards. Separate driver handshake/metadata SELECTs and statement
+preparations from application Execute counts. Verify idle retention: mysql_async 0.36.2
+with zero minimum and default zero idle TTL drops every returned connection; a bounded
+pool can still churn connections. Tadalist's retained eight-connection pool eliminated
+six handshakes per list page in local release measurements, with parity rerun. Keep logs isolated from production and redact actual credentials.
 
 Memory accounting should identify RSS/PSS versus cgroup usage, inactive cache exclusions,
 allocator arenas and kernel socket buffers. Startup should measure to meaningful readiness,
