@@ -142,8 +142,9 @@ These are app-specific adapters to implement, not preexisting scripts. Snapshot
 commands emit deterministic JSON for stored rows, storage manifests, mail/webhook
 captures and queue/search outboxes. Sort rows by their real keys. Include all
 relevant databases; omit or normalize a value only through a documented decision.
-The tool validates all commands before doing any reset, verifies equal starting
-snapshots, executes each implementation and compares final snapshots. It reports
+The tool validates all commands before doing any reset, resets and snapshots both
+independent fixtures, and requires equal starting states before either action runs.
+It then executes each implementation and compares final snapshots. It reports
 hashes, not sensitive fixture values. An empty snapshot is not meaningful evidence.
 
 ## Performance
@@ -165,9 +166,24 @@ argv recorded in benchmark artifacts.
 ## Readiness
 
 `doctor` reports configuration/evidence gaps and exits nonzero when incomplete.
-`verify` requires complete preflight, then runs configured format/lint/tests,
-rollback rehearsal and HTTP parity. Configure fixture-dependent tests to fail
-when their seed or service is absent. Do not substitute `true` for a required gate.
-Evidence links alone do not prove a contract; review their results, revision and
-scope. The generated CI checks Rust only, until fixture-enabled checks are added.
-Neither command publishes or deploys an app.
+For verified contracts, evidence files must exist. JSON evidence must identify the
+pinned reference SHA; malformed JSON and unsuccessful `passed` or `ready` results
+fail preflight. Narrative and browser artifacts still require review of their
+results, revision and scope; file existence is not proof of their claims.
+
+`verify` requires all contracts verified or explicitly not applicable, then runs
+configured format/lint/tests, rollback rehearsal and HTTP parity. It also runs
+mutation comparison whenever adapters are configured, the mutations contract is
+applicable, or the HTTP inventory contains writes (including `mutates: true` GETs).
+Read-only ports must mark the mutations contract not applicable with a reason.
+
+Use `verify --partial` during migration. It permits pending/implemented contracts
+and an unconfigured rollback rehearsal, runs the format/lint/tests and HTTP gates,
+and includes configured rollback and mutation checks. Implemented/verified mutation
+contracts and HTTP writes still require mutation adapters. Its report explicitly
+says `scope: partial`; a passing slice is not evidence that the migration is complete.
+All verified evidence is checked in both modes, and preflight errors list the gaps.
+
+Configure fixture-dependent tests to fail when their seed or service is absent.
+Do not substitute `true` for a required gate. The generated CI checks Rust only,
+until fixture-enabled checks are added. Neither command publishes or deploys an app.

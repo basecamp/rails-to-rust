@@ -23,7 +23,7 @@ Rust, Rails and fixture services are needed for their respective checks.
 | `parity` | Compare expected statuses, selected headers and HTTP bodies |
 | `mutation-diff` | Compare persisted state and captured effects from independently reset fixtures |
 | `benchmark` | Record balanced before/after process timings and raw rounds |
-| `doctor` / `verify` | Report missing migration gates / execute the configured gates |
+| `doctor` / `verify` | Check evidence and execute gates; `verify --partial` checks work in progress |
 
 The entry skill guides inventory, reference setup, contracts, vertical slices,
 parity, performance and cutover. Specialized skills cover each phase. Generated

@@ -48,6 +48,8 @@ def parser():
         child = commands.add_parser(name)
         child.add_argument("--output", default=default)
         child.add_argument("--force", action="store_true")
+        if name == "verify":
+            child.add_argument("--partial", action="store_true", help="verify completed slices while other contracts remain unfinished")
     commands.add_parser("doctor", help="report missing configuration and compatibility evidence")
     bench = commands.add_parser("benchmark", help="compare whole-process wall time with balanced alternating runs")
     bench.add_argument("--before", required=True, help="JSON argv array for baseline command")
@@ -88,7 +90,7 @@ def main(argv=None):
             value = (compare if args.command == "parity" else mutation_diff)(args.project, output=args.output, force=args.force)
         elif args.command in {"doctor", "verify"}:
             from .checks import doctor, verify
-            value = doctor(args.project) if args.command == "doctor" else verify(args.project, output=args.output, force=args.force)
+            value = doctor(args.project) if args.command == "doctor" else verify(args.project, output=args.output, force=args.force, partial=args.partial)
         else:
             from .benchmark import benchmark
             value = benchmark(args.project, json.loads(args.before), json.loads(args.after), rounds=args.rounds,
