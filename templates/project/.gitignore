@@ -1,0 +1,8 @@
+target/
+__pycache__/
+*.pyc
+parity/.seed/
+parity/results/
+.env
+.env.*
+!.env.example

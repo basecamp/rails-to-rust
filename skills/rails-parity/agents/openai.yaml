@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rails Rust Parity"
+  short_description: "Prove behavior, mutations and rollback continuity"
+  default_prompt: "Use $rails-parity for this Rails-to-Rust migration phase."

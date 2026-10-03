@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rails to Rust"
+  short_description: "Guide a compatible Rails-to-Rust migration"
+  default_prompt: "Use $rails-to-rust for this Rails-to-Rust migration phase."

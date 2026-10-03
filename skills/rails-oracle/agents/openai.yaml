@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rails Runtime Oracle"
+  short_description: "Capture behavior from the real Rails runtime"
+  default_prompt: "Use $rails-oracle for this Rails-to-Rust migration phase."

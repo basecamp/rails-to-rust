@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rails Rust Performance"
+  short_description: "Measure gains without changing compatibility"
+  default_prompt: "Use $rails-performance for this Rails-to-Rust migration phase."

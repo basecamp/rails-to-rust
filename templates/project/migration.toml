@@ -1,0 +1,31 @@
+version = 1
+
+[project]
+name = "@@NAME@@"
+reference_sha = "@@SHA@@"
+
+[oracle]
+# Runs inside the pinned Rails runtime, with isolated fixture databases and test secrets.
+# argv placeholders: {project}, {reference}, {script}. No implicit local-Ruby fallback.
+# Modern example: ["bundle", "exec", "rails", "runner", "{script}"]
+# Legacy example: ["bundle", "exec", "ruby", "script/runner", "{script}"]
+# For Docker, mount {project} at /work and pass /work/reference-tools/export.rb.
+command = []
+working_directory = "reference"
+timeout_seconds = 180
+
+[parity]
+reference_url = "http://127.0.0.1:7071"
+candidate_url = "http://127.0.0.1:7070"
+cases = "parity/cases.json"
+# Required for mutating requests: restore independently to the same seed on each side.
+# The command receives {side} = reference or candidate. It must affect fixture data only.
+reset_command = []
+timeout_seconds = 15
+
+[checks]
+format = ["cargo", "fmt", "--all", "--", "--check"]
+lint = ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]
+test = ["cargo", "test", "--workspace"]
+# Configure a real Rails->Rust->Rails data/session rollback rehearsal on fixture copies.
+rollback = []

@@ -1,0 +1,15 @@
+[workspace]
+resolver = "3"
+members = ["crates/app"]
+
+[workspace.package]
+edition = "2024"
+publish = false
+
+[workspace.dependencies]
+axum = { version = "0.8", default-features = false, features = ["tokio", "http1"] }
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal"] }
+
+[profile.release]
+lto = "fat"
+codegen-units = 1

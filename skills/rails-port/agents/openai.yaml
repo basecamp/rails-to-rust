@@ -1,0 +1,4 @@
+interface:
+  display_name: "Port Rails Behavior"
+  short_description: "Implement complete slices against Rails evidence"
+  default_prompt: "Use $rails-port for this Rails-to-Rust migration phase."

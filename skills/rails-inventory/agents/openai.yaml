@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rails Migration Inventory"
+  short_description: "Map Rails behavior and migration constraints"
+  default_prompt: "Use $rails-inventory for this Rails-to-Rust migration phase."

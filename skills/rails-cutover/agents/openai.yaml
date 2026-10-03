@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rails Rust Cutover"
+  short_description: "Prepare deployment with tested rollback continuity"
+  default_prompt: "Use $rails-cutover for this Rails-to-Rust migration phase."
