@@ -19,7 +19,7 @@ from rails_to_rust.project import initialize
 from rails_to_rust.oracle import capture
 from rails_to_rust.generate import records, routes, contract_test
 from rails_to_rust.parity import compare, mutation_diff
-from rails_to_rust.checks import doctor
+from rails_to_rust.checks import doctor, verify
 from rails_to_rust.benchmark import benchmark
 
 
@@ -250,15 +250,129 @@ rollback = []
             compare(self.port)
 
     def test_mutation_diff_compares_equal_baselines_and_changed_state(self):
-        state = self.port / "state.json"
-        reset = [sys.executable, "-c", f"from pathlib import Path; Path({str(state)!r}).write_text('{{\"rows\":[]}}')"]
-        snapshot = [sys.executable, "-c", f"from pathlib import Path; print(Path({str(state)!r}).read_text())"]
-        action = [sys.executable, "-c", f"from pathlib import Path; Path({str(state)!r}).write_text('{{\"rows\":[1]}}')"]
-        config = self.port / "migration.toml"
-        config.write_text(config.read_text() + "\n[mutations]\n" + '\n'.join(
-            key + " = " + json.dumps(value) for key, value in [("reset_command", reset), ("snapshot_command", snapshot),
-                                                               ("reference_command", action), ("candidate_command", action)]))
+        self.configure_mutations()
         self.assertTrue(mutation_diff(self.port)["passed"])
+        for side in ["reference", "candidate"]:
+            self.assertEqual(json.loads((self.port / (side + ".json")).read_text()), {"rows": [1]})
+
+    def configure_mutations(self, *, unequal_baseline=False, unequal_result=False):
+        reset_code = "from pathlib import Path; import json,sys; "
+        reset_code += "rows = [9] if sys.argv[1] == 'candidate' else []; " if unequal_baseline else "rows = []; "
+        reset_code += "Path(sys.argv[1] + '.json').write_text(json.dumps({'rows': rows}))"
+        snapshot_code = "from pathlib import Path; import sys; print(Path(sys.argv[1] + '.json').read_text())"
+        action_code = "from pathlib import Path; import json,sys; Path(sys.argv[1] + '.ran').touch(); "
+        action_code += "rows = [2] if sys.argv[1] == 'candidate' else [1]; " if unequal_result else "rows = [1]; "
+        action_code += "Path(sys.argv[1] + '.json').write_text(json.dumps({'rows': rows}))"
+        commands = {"reset_command": [sys.executable, "-c", reset_code, "{side}"],
+                    "snapshot_command": [sys.executable, "-c", snapshot_code, "{side}"],
+                    "reference_command": [sys.executable, "-c", action_code, "reference"],
+                    "candidate_command": [sys.executable, "-c", action_code, "candidate"]}
+        path = self.port / "migration.toml"
+        path.write_text(path.read_text() + "\n[mutations]\n" + "\n".join(
+            name + " = " + json.dumps(argv) for name, argv in commands.items()))
+
+    def configure_verification(self, *, status="pending", mutations="not-applicable"):
+        path = self.port / "migration.toml"
+        text = path.read_text().replace("command = []", "command = " + json.dumps([sys.executable]), 1)
+        gates = []
+        for name in ["format", "lint", "test"]:
+            code = "from pathlib import Path; Path(" + repr(name + ".ran") + ").touch()"
+            gates.append(name + " = " + json.dumps([sys.executable, "-c", code]))
+        path.write_text(text + "\n" + "\n".join(gates) + "\n")
+        ledger = {"version": 1, "reference_sha": self.sha, "contracts": [
+            {"id": "data", "status": status, "evidence": ["parity/results/evidence.json"]},
+            {"id": "mutations", "status": mutations, "reason": "fixture is read-only",
+             "evidence": ["parity/results/evidence.json"]}]}
+        write(self.port / "plans/contracts.json", json.dumps(ledger))
+        write(self.port / "parity/results/evidence.json", json.dumps({"reference_sha": self.sha, "passed": True}))
+
+    def test_unequal_mutation_baselines_run_neither_action(self):
+        self.configure_mutations(unequal_baseline=True)
+        with self.assertRaisesRegex(Error, "neither action"):
+            mutation_diff(self.port)
+        self.assertFalse((self.port / "reference.ran").exists())
+        self.assertFalse((self.port / "candidate.ran").exists())
+        self.assertFalse((self.port / "parity/results/mutation.json").exists())
+
+    def test_partial_verify_runs_gates_while_complete_verify_refuses_pending_contracts(self):
+        self.configure_verification()
+        with server() as left, server() as right:
+            self.cases([{"id": "home", "path": "/", "expected_status": 200}], left, right)
+            with self.assertRaisesRegex(Error, "not verified"):
+                verify(self.port)
+            self.assertFalse((self.port / "test.ran").exists())
+            result = verify(self.port, partial=True)
+        self.assertTrue(result["passed"])
+        self.assertEqual(result["scope"], "partial")
+        self.assertEqual([row["check"] for row in result["checks"]], ["format", "lint", "test", "http-parity"])
+        self.assertTrue(all((self.port / (name + ".ran")).exists() for name in ["format", "lint", "test"]))
+
+    def test_verified_evidence_rejects_failed_stale_and_invalid_json(self):
+        self.configure_verification(status="verified")
+        path = self.port / "parity/results/evidence.json"
+        with server() as left, server() as right:
+            self.cases([{"id": "home", "path": "/", "expected_status": 200}], left, right)
+            for value in [{"reference_sha": self.sha, "passed": False},
+                          {"reference_sha": "old", "passed": True},
+                          {"reference_sha": self.sha, "ready": False},
+                          {"reference_sha": self.sha, "passed": "true"}, []]:
+                with self.subTest(value=value):
+                    path.write_text(json.dumps(value))
+                    with self.assertRaisesRegex(Error, "evidence"):
+                        verify(self.port, partial=True)
+                    self.assertFalse((self.port / "test.ran").exists())
+            path.write_text("not JSON")
+            with self.assertRaisesRegex(Error, "invalid JSON"):
+                verify(self.port, partial=True)
+            path.write_text(json.dumps({"reference_sha": self.sha, "passed": True}))
+            self.assertTrue(verify(self.port, partial=True)["passed"])
+
+    def test_complete_verify_runs_mutations_and_propagates_state_mismatch(self):
+        self.configure_verification(status="verified", mutations="verified")
+        self.configure_mutations(unequal_result=True)
+        path = self.port / "migration.toml"
+        path.write_text(path.read_text().replace("rollback = []", "rollback = " + json.dumps(
+            [sys.executable, "-c", "from pathlib import Path; Path('rollback.ran').touch()"])))
+        with server() as left, server() as right:
+            self.cases([{"id": "home", "path": "/", "expected_status": 200}], left, right)
+            result = verify(self.port)
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["scope"], "complete")
+        self.assertFalse(result["checks"][-1]["passed"])
+        self.assertEqual(result["checks"][-1]["check"], "mutation-parity")
+        self.assertTrue((self.port / "rollback.ran").exists())
+        self.assertFalse(json.loads((self.port / "parity/results/verification-mutation.json").read_text())["passed"])
+
+    def test_partial_verify_requires_mutation_adapters_for_implemented_writes(self):
+        self.configure_verification(mutations="implemented")
+        with server() as left, server() as right:
+            self.cases([{"id": "home", "path": "/", "expected_status": 200}], left, right)
+            with self.assertRaisesRegex(Error, "command array"):
+                verify(self.port, partial=True)
+            self.assertFalse((self.port / "test.ran").exists())
+
+    def test_complete_readonly_verify_requires_rollback_and_can_pass(self):
+        self.configure_verification(status="verified")
+        with server() as left, server() as right:
+            self.cases([{"id": "home", "path": "/", "expected_status": 200}], left, right)
+            with self.assertRaisesRegex(Error, "command array"):
+                verify(self.port)
+            path = self.port / "migration.toml"
+            path.write_text(path.read_text().replace("rollback = []", "rollback = " + json.dumps(
+                [sys.executable, "-c", "from pathlib import Path; Path('rollback.ran').touch()"])))
+            result = verify(self.port)
+        self.assertTrue(result["passed"])
+        self.assertEqual(result["scope"], "complete")
+        self.assertTrue((self.port / "rollback.ran").exists())
+        self.assertNotIn("mutation-parity", [row["check"] for row in result["checks"]])
+
+    def test_partial_write_inventory_requires_state_comparison_even_if_ledger_says_readonly(self):
+        self.configure_verification()
+        self.cases([{"id": "write", "path": "/", "method": "POST", "expected_status": 200}],
+                   "http://127.0.0.1:1", "http://127.0.0.1:2")
+        with self.assertRaisesRegex(Error, "command array"):
+            verify(self.port, partial=True)
+        self.assertFalse((self.port / "test.ran").exists())
 
     def test_benchmark_balances_order_and_rejects_different_output(self):
         argv = [sys.executable, "-c", "print('same')"]

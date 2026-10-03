@@ -88,6 +88,10 @@ def normalized(data, case):
         raise Error(f"{case['id']}: response cannot be decoded as {comparison}") from error
 
 
+def mutating(case):
+    return case.get("mutates", False) or case.get("method", "GET").upper() not in {"GET", "HEAD", "OPTIONS"}
+
+
 def compare(root, *, output="parity/results/http.json", force=False):
     root, config = project(root)
     settings = config["parity"]
@@ -98,10 +102,9 @@ def compare(root, *, output="parity/results/http.json", force=False):
             raise Error(f"{key} must be an HTTP(S) base URL without credentials, query or fragment")
     results = []
     for case in cases:
-        mutates = case.get("mutates", False) or case.get("method", "GET").upper() not in {"GET", "HEAD", "OPTIONS"}
         responses = {}
         for side in ["reference", "candidate"]:
-            if mutates:
+            if mutating(case):
                 argv = command(settings.get("reset_command"), side=side, project=str(root), reference=str(root / "reference"))
                 run(argv, cwd=root, timeout=180)
             responses[side] = request(settings[side + "_url"], case, settings.get("timeout_seconds", 15))
@@ -128,33 +131,41 @@ def compare(root, *, output="parity/results/http.json", force=False):
 def mutation_diff(root, *, output="parity/results/mutation.json", force=False):
     root, config = project(root)
     settings = config.get("mutations", {})
-    # Validate the complete protocol before executing any reset or mutation.
-    commands = {}
-    for side in ["reference", "candidate"]:
-        commands[side] = {key: command(settings.get(key), side=side, project=str(root), reference=str(root / "reference"))
-                          for key in ["reset_command", "snapshot_command", side + "_command"]}
+    commands = mutation_commands(root, config)
     before, after = {}, {}
     for side in ["reference", "candidate"]:
         argv = commands[side]
         run(argv["reset_command"], cwd=root, timeout=180)
-        try:
-            before[side] = json.loads(run(argv["snapshot_command"], cwd=root, timeout=180))
-        except ValueError as error:
-            raise Error("snapshot_command must emit deterministic JSON, including rows and captured side effects") from error
-        if not isinstance(before[side], dict) or not before[side]:
-            raise Error("snapshots must be nonempty JSON objects naming the observed state")
-        if side == "candidate" and before[side] != before["reference"]:
-            raise Error("mutation baseline states differ; candidate action was not run")
+        before[side] = snapshot(root, argv["snapshot_command"])
+    if before["reference"] != before["candidate"]:
+        raise Error("mutation baseline states differ; neither action was run")
+    for side in ["reference", "candidate"]:
+        argv = commands[side]
         run(argv[side + "_command"], cwd=root, timeout=settings.get("timeout_seconds", 180))
-        try:
-            after[side] = json.loads(run(argv["snapshot_command"], cwd=root, timeout=180))
-        except ValueError as error:
-            raise Error("snapshot_command emitted invalid post-mutation JSON") from error
-        if not isinstance(after[side], dict) or not after[side]:
-            raise Error("post-mutation snapshots must be nonempty JSON objects")
+        after[side] = snapshot(root, argv["snapshot_command"])
     passed = after["reference"] == after["candidate"]
     value = {"version": 1, "kind": "mutation-parity", "reference_sha": config["project"]["reference_sha"],
              "passed": passed, "baseline_equal": True,
              "state_sha256": {side: hashlib.sha256(json_text(state).encode()).hexdigest() for side, state in after.items()}}
     write(generated_path(root, output), json_text(value), force=force)
+    return value
+
+
+def mutation_commands(root, config):
+    # Validate the complete protocol before executing any reset or mutation.
+    settings = config.get("mutations", {})
+    commands = {}
+    for side in ["reference", "candidate"]:
+        commands[side] = {key: command(settings.get(key), side=side, project=str(root), reference=str(root / "reference"))
+                          for key in ["reset_command", "snapshot_command", side + "_command"]}
+    return commands
+
+
+def snapshot(root, argv):
+    try:
+        value = json.loads(run(argv, cwd=root, timeout=180))
+    except ValueError as error:
+        raise Error("snapshot_command must emit deterministic JSON, including rows and captured side effects") from error
+    if not isinstance(value, dict) or not value:
+        raise Error("snapshots must be nonempty JSON objects naming the observed state")
     return value
