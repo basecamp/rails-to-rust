@@ -32,8 +32,8 @@ A compiling scaffold, a count of translated files, or all-green tests without re
 is not evidence of a working replacement. The starter intentionally returns HTTP 501.
 
 Choose the existing database, storage and integration topology first. Framework decisions follow
-measured needs and compatibility. Campfire's SQLite and Rails 8 architecture is one example;
-Backpack's MySQL and Rails 2.3 LTS architecture is another. Read the active phase's references,
+measured needs and compatibility. A current Rails/SQLite app and a legacy Rails/MySQL app
+can require different designs. Read the active phase's references,
 not every reference at once.
 
 ## Keep durable state

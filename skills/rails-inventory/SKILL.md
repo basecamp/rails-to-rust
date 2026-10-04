@@ -23,8 +23,8 @@ systems, scheduled jobs, mail ingress/egress, search, realtime, storage and depl
 A private gem source or unsupported runtime is a setup task, not permission to invent behavior.
 
 Select the UI bar: equivalent behavior, normalized DOM, byte-exact responses, or pixel parity
-on a named browser/viewport/theme/language matrix. Do not impose Campfire's pixel requirement
-on an application whose user chose Backpack-style interaction parity.
+on a named browser/viewport/theme/language matrix. Choose pixel parity or interaction parity
+with the user; neither is a universal requirement.
 
 ## Deliver a usable plan
 
