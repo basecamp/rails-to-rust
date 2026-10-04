@@ -53,6 +53,26 @@ links and persisted data all need both directions. Security-sensitive behavior a
 independent rejection properties. A framework oracle can carry an app-specific exception;
 porting it must not accidentally widen that exception.
 
+## Security and portable provenance
+
+Capture unsafe legacy behavior as evidence, then pair compatibility checks with independent
+security properties. Test a missing/invalid CSRF token together with a valid persistent-login
+cookie: resetting a session is insufficient if a later filter restores authentication. Reordering
+and mobile requests may omit form tokens; protect them while supplying same-origin headers,
+and prove headers are not attached to off-origin requests. Record any old-tab reload requirement.
+
+Validate account hosts against a configured domain and build sensitive email origins from
+trusted domain/port/scheme configuration. Check attacker suffixes, nested account labels,
+malformed authority text and forwarded headers; rejection must leave rows and mail unchanged.
+Document deliberate security differences per case rather than globally masking authorization,
+status codes or effects until the old and new implementations appear equal.
+
+Runtime provenance should identify versions and revision suffixes without embedding developer
+home paths or private bundle layout. Exercise the real exporter, retain stable installed
+basenames, and regenerate vectors from the reference instead of hand-editing expected values.
+For an unprivileged container, inspect its configured user and run the image: assert actual
+UID/GID, file permissions and meaningful readiness, not just a `USER` line in the Dockerfile.
+
 ## Completion
 
 Report pass/fail/ignored/fixture-skipped counts, exact revisions and supported matrix. Required

@@ -127,7 +127,7 @@ module ActiveRecord
   end
 end
 # Gem metadata is part of the export and must preserve the original bytes.
-spec = Struct.new(:version, :full_gem_path).new('1', UnsafeJsonString.new("café 日本 🍣"))
+spec = Struct.new(:version, :full_gem_path).new('1', UnsafeJsonString.new("/private/home/bundle/café 日本 🍣-deadbeef"))
 Gem.loaded_specs['fixture'] = spec
 """
         script = self.base / "exporter-test.rb"
@@ -136,7 +136,9 @@ Gem.loaded_specs['fixture'] = spec
         result = subprocess.run([ruby, str(script)], env=env, capture_output=True, check=True)
         output = result.stdout.decode()
         payload = json.loads(output.split(BEGIN, 1)[1].split(END, 1)[0])
-        self.assertEqual(payload["data"]["gems"]["fixture"]["source"], "café 日本 🍣")
+        self.assertEqual(payload["data"]["gems"]["fixture"]["source"], "café 日本 🍣-deadbeef")
+        self.assertEqual(payload["runtime"]["gems"]["fixture"]["source"], "café 日本 🍣-deadbeef")
+        self.assertNotIn("/private/home", output)
         self.assertIsInstance(payload["runtime"]["ruby_patchlevel"], int)
         self.assertEqual(payload["reference_sha"], self.sha)
 
