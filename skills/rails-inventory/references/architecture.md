@@ -4,11 +4,11 @@ The reusable part is the evidence-driven migration process and compatibility lea
 single application framework. Reusing an audited primitive can save work; importing a whole
 port carries app policy, runtime version assumptions and dependencies along with it.
 
-| Concern | Campfire | Backpack | Decision for a new app |
+| Concern | Modern Rails example | Legacy Rails example | Decision for a new app |
 |---|---|---|---|
 | Reference runtime | Current Rails, modern Ruby | Rails 2.3 LTS, Ruby 2.5, private forks | Read locked runtime and gem implementation |
 | Data | SQLite/WAL, single writer | MySQL app and identity databases | Preserve actual backends and raw connection encoding |
-| Sessions | Modern signing/encryption metadata | Marshal CookieStore and SignalId signatures | Probe derivation, serialization, purpose, expiry and rotation |
+| Sessions | Modern signing/encryption metadata | Marshal CookieStore and custom identity signatures | Probe derivation, serialization, purpose, expiry and rotation |
 | Views | ERB/Askama, Turbo/Stimulus, Action Text | ERB, RJS, Builder, Prototype, Textile | Ship existing frontend; port its actual rendering protocol |
 | Jobs | In-process queues | DB-backed claims/schedules, separate roles | Derive durability/leadership from app semantics |
 | Storage | Active Storage disk/variants | Legacy S3/depot paths, ImageMagick replacement | Preserve keys, checksums and existing derived objects |
@@ -23,8 +23,8 @@ simpler than replacing them with custom code. Framework removal is worthwhile wh
 real unused work; a clean unused-dependency audit is not proof every dependency is the best fit.
 
 Check compatibility before retiring Redis, caches, workers or other deployment services.
-Backpack's cache removal and job leadership are app-specific measured decisions. They do not
-establish that every Rails cache or queue can disappear.
+Cache removal and job leadership changes need app-specific measurements and compatibility
+evidence; they do not establish that every Rails cache or queue can disappear.
 
 A domain map needs ownership of transactions and external effects. Separate databases and
 services cannot be made atomic by nesting helper functions: state ordered commits, outbox or

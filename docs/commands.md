@@ -146,6 +146,10 @@ The tool validates all commands before doing any reset, resets and snapshots bot
 independent fixtures, and requires equal starting states before either action runs.
 It then executes each implementation and compares final snapshots. It reports
 hashes, not sensitive fixture values. An empty snapshot is not meaningful evidence.
+Both actions must produce an observed state change by default: matching no-op or
+404 responses do not establish mutation parity. For an intentionally rejected/no-op
+mutation scenario, set `[mutations] expect_change = false` explicitly and check its
+HTTP status and rejection invariants in the action adapter.
 
 ## Performance
 

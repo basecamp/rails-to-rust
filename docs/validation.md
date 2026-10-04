@@ -1,15 +1,16 @@
 # Initial validation — 2026-10-03
 
-The toolkit was exercised against both source applications, not only toy Ruby stubs.
-The source revisions inspected for the lessons are recorded in [lessons.md](lessons.md).
+The toolkit was exercised against real modern and legacy Rails applications, as well as
+portable fixtures. These results describe export/code-generation coverage; reproducing
+live checks requires your own application and its exact reference runtime.
 
 | Reference runtime | Runtime/schema/routes exported | Generated records compiled | Ordered route contracts compiled |
 |---|---|---:|---:|
-| Backpack: Ruby 2.5.9, Rails 2.3.18 LTS, MySQL | Yes | 49 tables | 473 routes |
-| Campfire: Ruby 3.4.10, Rails 8.2.0.alpha, SQLite | Yes | 17 tables | 178 routes |
+| Legacy app: Ruby 2.5.9, Rails 2.3.18 LTS, MySQL | Yes | 49 tables | 473 routes |
+| Modern app: Ruby 3.4.10, Rails 8.2.0.alpha, SQLite | Yes | 17 tables | 178 routes |
 
-Backpack probes ran read-only against its existing local parity reference container,
-with that fixture's normal startup overrides. Campfire probes used a copy of its pinned
+Legacy probes ran read-only against a local parity reference container,
+with that fixture's normal startup overrides. Modern probes used a copy of the pinned
 source mounted read-only, a copied seed database, test-only secret and isolated writable
 storage/log/tmp mounts. The exporters never changed the original source checkouts.
 
@@ -17,7 +18,7 @@ The emitted schema and route envelopes were fed into the toolkit generators. All
 resulting Rust modules compiled with Rust 1.98.1. This validates contract export and code
 emission; it does not establish application behavior, route recognition or model typecasting.
 
-A real Campfire-source initialization also produced a self-contained starter whose Rust
+A real application-source initialization also produced a self-contained starter whose Rust
 binary compiled and passed strict Clippy. Its observed response was HTTP 501, and it drained
 and exited normally on Ctrl-C. Its empty unit-test suite does not count as application parity.
 A fresh starter's doctor command correctly reports incomplete migration gates.

@@ -1,8 +1,8 @@
 # Rails to Rust
 
 Skills and generators for agents converting Rails applications into compatible Rust
-applications. Learned from [Campfire](https://github.com/basecamp/once-campfire-rust)
-and [Backpack](https://github.com/basecamp/backpack-rust), including modern and Rails 2.3 LTS apps.
+applications, including modern Rails and Rails 2.3 LTS apps. The toolkit and its guidance
+are self-contained; use your own application as the pinned reference.
 
 ```sh
 bin/rails-to-rust init ../my-rails-app ../my-app-rust --name my_app
