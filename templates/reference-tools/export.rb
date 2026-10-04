@@ -96,7 +96,9 @@ module RailsToRust
     gems = {}
     Gem.loaded_specs.keys.sort.each do |name|
       spec = Gem.loaded_specs[name]
-      gems[name] = { "version" => spec.version.to_s, "source" => spec.full_gem_path }
+      # Keep the installed basename (including Git revision suffixes), not the
+      # developer's absolute bundle path, in portable committed evidence.
+      gems[name] = { "version" => spec.version.to_s, "source" => File.basename(String.new(spec.full_gem_path)) }
     end
     { "ruby_version" => RUBY_VERSION, "ruby_patchlevel" => RUBY_PATCHLEVEL, "rails_version" => rails_version,
       "adapter" => adapter, "gems" => gems }
