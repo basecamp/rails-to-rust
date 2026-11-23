@@ -1,9 +1,34 @@
 name: Toolkit tests
 on: [push, pull_request]
+permissions: {}
 jobs:
+  lint-actions:
+    name: GitHub Actions audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: Run actionlint
+        uses: rhysd/actionlint@393031adb9afb225ee52ae2ccd7a5af5525e03e8 # v1.7.11
+        with:
+          # actionlint checks only .github/workflows unless given files, and the
+          # template is what every generated port starts from. It takes files, not
+          # folders, so a new workflow in either place is added here by name.
+          args: .github/workflows/ci.yml templates/project/.github/workflows/ci.yml
+      - name: Run zizmor
+        uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054 # v0.6.2
+        with:
+          advanced-security: false
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - run: python3 -m unittest discover -s tests -v
       - run: ruby -c templates/reference-tools/export.rb

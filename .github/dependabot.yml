@@ -1,0 +1,16 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    # A directory other than / is scanned for workflow files directly, so the
+    # template's workflows are named by their own folder.
+    directories:
+      - /
+      - /templates/project/.github/workflows
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    cooldown:
+      default-days: 7
