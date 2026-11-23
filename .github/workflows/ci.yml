@@ -13,6 +13,11 @@ jobs:
           persist-credentials: false
       - name: Run actionlint
         uses: rhysd/actionlint@393031adb9afb225ee52ae2ccd7a5af5525e03e8 # v1.7.11
+        with:
+          # actionlint checks only .github/workflows unless given files, and the
+          # template is what every generated port starts from. It takes files, not
+          # folders, so a new workflow in either place is added here by name.
+          args: .github/workflows/ci.yml templates/project/.github/workflows/ci.yml
       - name: Run zizmor
         uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054 # v0.6.2
         with:
